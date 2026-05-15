@@ -1,6 +1,5 @@
 import requests
 import time
-# 👇 只加了这两个保活需要的库，其他完全不动
 import threading
 from flask import Flask
 
@@ -19,7 +18,7 @@ ALLOW_PRIV_IDS = {12936171, 13292834}
 ADMIN_ID = 0
 
 # 图片配置
-PHOTO_ID = "tos-cn-i-a9rns2rl98/505333243eb24c6fbff2cc068c729cbb.png"
+PHOTO_ID = "tos-cn-i-a9rns2r198/505333243eb24c6fbff2cc068c729cbb.png"
 
 # 定时与冷却
 INTERVAL = 5400
@@ -27,17 +26,15 @@ COOLDOWN = 10
 last_reply_time = {}
 # ===========================
 
-# ======================================
-# 👇 保活代码（完全不影响你原有功能）
-# ======================================
-app = Flask(__name__)
+# ====================== 云服务器专用保活（ Railway 必加，防止休眠断线）======================
+app = Flask("")
+@app.route('/')
+def home():
+    return "Bot is alive"
 
-@app.route("/")
-def index():
-    return "✅ BOT RUNNING - KEEP ALIVE SUCCESS"
-
-def run_keep_alive():
-    app.run(host="0.0.0.0", port=5000)
+def run_server():
+    app.run(host='0.0.0.0', port=8080)
+# ============================================================================================
 
 # AI 聊天函数
 def ai_chat(text):
@@ -114,9 +111,7 @@ def main():
                 cid = msg.get("chat", {}).get("id")
                 uid = msg.get("from", {}).get("id")
 
-                # ======================
-                # 私聊处理逻辑（已修复：变量名正确，白名单用户私聊支持AI回复）
-                # ======================
+                # 私聊处理逻辑
                 is_private = (cid == uid)
                 if is_private:
                     if uid in ALLOW_PRIV_IDS:
@@ -205,6 +200,7 @@ def main():
             time.sleep(5)
 
 if __name__ == "__main__":
-    # 👇 只加了这一行启动保活，其他完全不动
-    threading.Thread(target=run_keep_alive, daemon=True).start()
+    # 启动保活（防止 Railway 休眠断线）
+    threading.Thread(target=run_server, daemon=True).start()
+    # 启动机器人
     main()
