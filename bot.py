@@ -8,12 +8,12 @@ BOT_TOKEN = "13315694:3DeXn2PLZL87EKaCgSCUjTUwtTA_qEEoHyY"
 API = "https://api.safew.org/bot" + BOT_TOKEN
 PUSH_CHAT_ID = 10000550625
 
-# 你的 Groq 密钥
+# Groq配置
 API_KEY = "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"
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "llama-3.1-8b-instant"
 
-# 私聊白名单（你的ID已添加：12936171、13292834）
+# 私聊&控制指令白名单
 ALLOW_PRIV_IDS = {12936171, 13292834}
 ADMIN_ID = 0
 
@@ -24,9 +24,12 @@ PHOTO_ID = "tos-cn-i-a9rns2r198/505333243eb24c6fbff2cc068c729cbb.png"
 INTERVAL = 5400
 COOLDOWN = 10
 last_reply_time = {}
+
+# AI全局开关：默认一直开启
+ai_enabled = True
 # ===========================
 
-# ====================== 云服务器专用保活（ Railway 必加，防止休眠断线）======================
+# 保活服务
 app = Flask("")
 @app.route('/')
 def home():
@@ -34,9 +37,8 @@ def home():
 
 def run_server():
     app.run(host='0.0.0.0', port=8080)
-# ============================================================================================
 
-# AI 聊天函数
+# AI聊天
 def ai_chat(text):
     try:
         headers = {
@@ -46,7 +48,7 @@ def ai_chat(text):
         data = {
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": "你是一个友好、简洁、自然的群聊助手。"},
+                {"role": "system", "content": "你是体育交流群高情商老群友风格，会主动接群里日常聊天、暖场互动。看到群里发赛事计划和走势推荐时，偶尔自然带动气氛，可以说：机会来了可以跟上计划员吃肉啦、行情不错看准节奏跟上稳稳吃肉、把握时机跟着计划员节奏就行这类话术，不要刷屏。遇到群友抱怨、心情不好、心态崩溃时，只会共情安抚、温柔鼓励打气，绝不讲大道理、不说教。有人问网址、入口、想参与要玩链接时，委婉引导对方私聊管理获取正规官方通道，不要自己发链接。全程只围绕体育赛事、赛事计划、走势闲聊，严禁出现违法、违规、风险、劝阻、戒玩等敏感说教字眼，语气接地气、智能化、像真人一样聊天。"},
                 {"role": "user", "content": text}
             ],
             "temperature": 0.7,
@@ -58,7 +60,7 @@ def ai_chat(text):
         print("AI错误:", e)
         return "暂时无法回复，请稍后再试~"
 
-# 发送文字
+# 发文字
 def send_text(chat_id, text):
     try:
         requests.post(f"{API}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=8)
@@ -66,7 +68,7 @@ def send_text(chat_id, text):
     except:
         return False
 
-# 发送图文
+# 发图文
 def send_photo_or_text(chat_id, text):
     try:
         requests.post(f"{API}/sendPhoto", json={
@@ -78,12 +80,13 @@ def send_photo_or_text(chat_id, text):
         send_text(chat_id, text)
 
 def main():
+    global ai_enabled
     offset = 0
-    print("✅ 机器人启动成功（Groq官方稳定AI）")
+    print("✅ 机器人启动成功")
     last_push_time = time.time()
     
     while True:
-        # 定时广告
+        # 定时广告推送
         if time.time() - last_push_time >= INTERVAL:
             ad_text = """🎉 每日赛事精选更新啦
 
@@ -111,7 +114,23 @@ def main():
                 cid = msg.get("chat", {}).get("id")
                 uid = msg.get("from", {}).get("id")
 
-                # 私聊处理逻辑
+                # ========== 白名单专属：开启 / 关闭 只回复收到 ==========
+                if uid in ALLOW_PRIV_IDS:
+                    if text == "开启":
+                        ai_enabled = True
+                        send_text(cid, "收到")
+                        continue
+                    if text == "关闭":
+                        ai_enabled = False
+                        send_text(cid, "收到")
+                        continue
+                # =============================================
+
+                # AI没开启直接跳过所有AI回复
+                if not ai_enabled:
+                    continue
+
+                # 私聊处理
                 is_private = (cid == uid)
                 if is_private:
                     if uid in ALLOW_PRIV_IDS:
@@ -125,6 +144,7 @@ def main():
                 # 管理员说话不回复
                 if uid == ADMIN_ID:
                     continue
+
                 # 防刷屏冷却
                 if uid in last_reply_time and time.time() - last_reply_time[uid] < COOLDOWN:
                     continue
